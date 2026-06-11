@@ -181,6 +181,7 @@ struct Ashell {
     system: SystemSnapshot,
     last_system_sample: Instant,
     last_theme_sync: Instant,
+    last_window_appearance: Option<gpui::WindowAppearance>,
     remote_sample_in_flight: bool,
     runtime: Runtime,
     events_rx: mpsc::Receiver<BackendEvent>,
@@ -336,6 +337,7 @@ impl Ashell {
             system,
             last_system_sample: Instant::now(),
             last_theme_sync: Instant::now(),
+            last_window_appearance: None,
             remote_sample_in_flight: false,
             runtime: Runtime::new().expect("create tokio runtime"),
             events_rx,
@@ -579,7 +581,11 @@ impl Ashell {
 
     fn sync_theme_if_due(&mut self, cx: &mut Context<Self>) {
         if self.follow_system_theme && self.last_theme_sync.elapsed() >= Duration::from_secs(1) {
-            Theme::sync_system_appearance(None, cx);
+            let appearance = cx.window_appearance();
+            if self.last_window_appearance != Some(appearance) {
+                Theme::sync_system_appearance(None, cx);
+                self.last_window_appearance = Some(appearance);
+            }
             self.last_theme_sync = Instant::now();
         }
     }
