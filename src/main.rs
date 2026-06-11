@@ -948,7 +948,7 @@ impl Ashell {
                         view.update(cx, |this, cx| {
                             this.activate_selector_selection(window, cx);
                         });
-                        true
+                        false
                     }
                 })
                 .content({
