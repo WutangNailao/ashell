@@ -2154,6 +2154,18 @@ impl Ashell {
         cx.notify();
     }
 
+    fn trigger_sftp_context_edit(&mut self, cx: &mut Context<Self>) {
+        let Some(menu) = self.sftp_context_menu.take() else {
+            return;
+        };
+        if let Some(id) = self.active_tab.clone() {
+            if let Some(handle) = self.sftp_handles.get(&id) {
+                handle.edit_file(menu.remote_path);
+            }
+        }
+        cx.notify();
+    }
+
     fn download_sftp_entry(
         &mut self,
         remote_path: String,
@@ -4118,9 +4130,9 @@ impl Render for Ashell {
             .children(Root::render_sheet_layer(window, cx))
             .when_some(self.sftp_context_menu.clone(), |this, menu| {
                 let label = if menu.is_dir {
-                    "Download Folder"
+                    t!("download_folder").to_string()
                 } else {
-                    "Download"
+                    t!("download").to_string()
                 };
                 this.child(
                     div()
@@ -4156,14 +4168,31 @@ impl Render for Ashell {
                                     cx.stop_propagation();
                                 })
                                 .child(
-                                    Button::new("sftp-context-download")
-                                        .ghost()
+                                    v_flex()
                                         .w_full()
-                                        .justify_start()
-                                        .label(label)
-                                        .on_click(cx.listener(|this, _, window, cx| {
-                                            this.trigger_sftp_context_download(window, cx);
-                                        })),
+                                        .child(
+                                            Button::new("sftp-context-download")
+                                                .ghost()
+                                                .w_full()
+                                                .justify_start()
+                                                .label(label)
+                                                .on_click(cx.listener(|this, _, window, cx| {
+                                                    this.trigger_sftp_context_download(window, cx);
+                                                })),
+                                        )
+                                        .when(!menu.is_dir && is_editable_text_file(&menu.remote_path), |this| {
+                                            this.child(
+                                                Button::new("sftp-context-edit")
+                                                    .ghost()
+                                                    .w_full()
+                                                    .justify_start()
+                                                    .label(t!("edit_file"))
+                                                    .tooltip(t!("edit_file_tooltip").to_string())
+                                                    .on_click(cx.listener(|this, _, _, cx| {
+                                                        this.trigger_sftp_context_edit(cx);
+                                                    }))
+                                            )
+                                        }),
                                 ),
                         ),
                 )
@@ -4470,4 +4499,18 @@ fn main() {
         }
         open_main_window(cx);
     });
+}
+
+fn is_editable_text_file(filename: &str) -> bool {
+    let lower = filename.to_lowercase();
+    let ext = std::path::Path::new(&lower).extension().and_then(|s| s.to_str()).unwrap_or("");
+    let known_exts = ["txt", "conf", "json", "yaml", "yml", "xml", "ini", "sh", "py", "rs", "js", "ts", "html", "css", "md", "toml", "csv", "log", "cfg"];
+    if known_exts.contains(&ext) {
+        return true;
+    }
+    let known_names = ["dockerfile", "makefile", ".gitignore", ".env"];
+    if known_names.contains(&lower.as_str()) {
+        return true;
+    }
+    false
 }

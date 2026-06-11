@@ -160,6 +160,9 @@ impl ConfigStore {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)
                 .with_context(|| format!("failed to create config dir {}", parent.display()))?;
+            let tmp_dir = parent.join("tmp");
+            let _ = fs::remove_dir_all(&tmp_dir);
+            let _ = fs::create_dir_all(&tmp_dir);
         }
 
         let cache = if path.exists() {
@@ -191,6 +194,10 @@ impl ConfigStore {
 
     pub fn sessions(&self) -> &[Session] {
         &self.cache.sessions
+    }
+
+    pub fn tmp_dir(&self) -> Option<PathBuf> {
+        self.path.parent().map(|p| p.join("tmp"))
     }
 
     pub fn follow_system_theme(&self) -> bool {
