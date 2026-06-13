@@ -1598,7 +1598,11 @@ impl Ashell {
                 let tab_id_clone = tab_id.clone();
                 let tab_id_clone2 = tab_id.clone();
                 let focus_handle = this.focus_handle.clone();
-                let marked_text = this.terminal_marked_text.clone();
+                let marked_text = if is_focused {
+                    this.terminal_marked_text.clone()
+                } else {
+                    None
+                };
                 let font_family = this.terminal_font_family.clone();
                 let font_size = px(this.terminal_font_size);
                 let line_height = px(this.terminal_line_height());
