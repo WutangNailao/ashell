@@ -800,11 +800,28 @@ async fn connect_and_authenticate(
             .context("password authentication failed")?,
         AuthMethod::Key => {
             let keypair = load_session_private_key(session)?;
-            let key = private_key_with_alg(keypair).context("invalid private key")?;
-            handle
-                .authenticate_publickey(&session.user, key)
-                .await
-                .context("public key authentication failed")?
+            let keys = private_keys_with_algs(keypair).context("invalid private key")?;
+            let mut success = false;
+            for key in keys {
+                match handle.authenticate_publickey(&session.user, key).await {
+                    Ok(true) => {
+                        success = true;
+                        break;
+                    }
+                    Ok(false) => {
+                        tracing::debug!("[sftp] public key auth failed with algorithm, trying next");
+                        continue;
+                    }
+                    Err(e) => {
+                        tracing::debug!("[sftp] public key auth error: {:?}, trying next", e);
+                        continue;
+                    }
+                }
+            }
+            if !success {
+                return Err(anyhow!("public key authentication failed for {}@{}:{}", session.user, session.host, session.port));
+            }
+            success
         }
     };
 
@@ -856,16 +873,31 @@ fn load_session_private_key(session: &Session) -> Result<PrivateKey> {
     Err(anyhow!(errors.join("; ")))
 }
 
-fn private_key_with_alg(keypair: PrivateKey) -> Result<PrivateKeyWithHashAlg> {
-    let hash_alg = if keypair.algorithm().is_rsa() {
-        Some(HashAlg::Sha512)
+fn private_keys_with_algs(keypair: PrivateKey) -> Result<Vec<PrivateKeyWithHashAlg>> {
+    let mut algs = Vec::new();
+    let key_arc = Arc::new(keypair);
+
+    if key_arc.algorithm().is_rsa() {
+        if let Ok(k) = PrivateKeyWithHashAlg::new(key_arc.clone(), Some(HashAlg::Sha512)) {
+            algs.push(k);
+        }
+        if let Ok(k) = PrivateKeyWithHashAlg::new(key_arc.clone(), Some(HashAlg::Sha256)) {
+            algs.push(k);
+        }
+        if let Ok(k) = PrivateKeyWithHashAlg::new(key_arc.clone(), None) {
+            algs.push(k);
+        }
     } else {
-        None
-    };
-    Ok(
-        PrivateKeyWithHashAlg::new(Arc::new(keypair.clone()), hash_alg)
-            .or_else(|_| PrivateKeyWithHashAlg::new(Arc::new(keypair), Some(HashAlg::Sha256)))?,
-    )
+        if let Ok(k) = PrivateKeyWithHashAlg::new(key_arc.clone(), None) {
+            algs.push(k);
+        }
+    }
+
+    if algs.is_empty() {
+        return Err(anyhow!("Failed to construct PrivateKeyWithHashAlg for any supported hash algorithm"));
+    }
+
+    Ok(algs)
 }
 
 fn normalize_inline_private_key(value: &str) -> String {
