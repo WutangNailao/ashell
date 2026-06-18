@@ -2464,6 +2464,21 @@ impl Render for Ashell {
                                 .size_full()
                                 .relative()
                                 .overflow_hidden()
+                                .when(
+                                    self.active_title_bar_style == crate::session::config::TitleBarStyle::Native,
+                                    |this| {
+                                        this.child(
+                                            div()
+                                                .flex_none()
+                                                .h(px(32.))
+                                                .w_full()
+                                                .bg(cx.theme().tab_bar)
+                                                .border_b_1()
+                                                .border_color(cx.theme().border)
+                                                .child(self.render_tab_bar(cx)),
+                                        )
+                                    },
+                                )
                                 .child(body_panel),
                         ),
                 )
@@ -2484,6 +2499,21 @@ impl Render for Ashell {
                     .size_full()
                     .relative()
                     .overflow_hidden()
+                    .when(
+                        self.active_title_bar_style == crate::session::config::TitleBarStyle::Native,
+                        |this| {
+                            this.child(
+                                div()
+                                    .flex_none()
+                                    .h(px(32.))
+                                    .w_full()
+                                    .bg(cx.theme().tab_bar)
+                                    .border_b_1()
+                                    .border_color(cx.theme().border)
+                                    .child(self.render_tab_bar(cx)),
+                            )
+                        },
+                    )
                     .child(body_panel),
             );
 
@@ -2526,30 +2556,32 @@ impl Render for Ashell {
                     this.close_tab(active_id, cx);
                 }
             }))
-            .child(
-                div()
-                    .id("title-bar")
-                    .flex()
-                    .items_center()
-                    .h(px(34.))
-                    .w_full()
-                    .bg(cx.theme().tab_bar)
-                    .on_double_click(|_, window, _| {
-                        #[cfg(target_os = "macos")]
-                        window.titlebar_double_click();
-                        #[cfg(not(target_os = "macos"))]
-                        window.zoom_window();
-                    })
-                    .child(self.render_window_controls(window, cx))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w(px(0.))
-                            .h_full()
-                            .window_control_area(WindowControlArea::Drag)
-                            .child(self.render_tab_bar(cx)),
-                    ),
-            )
+            .when(self.active_title_bar_style == crate::session::config::TitleBarStyle::Integrated, |this| {
+                this.child(
+                    div()
+                        .id("title-bar")
+                        .flex()
+                        .items_center()
+                        .h(px(34.))
+                        .w_full()
+                        .bg(cx.theme().tab_bar)
+                        .on_double_click(|_, window, _| {
+                            #[cfg(target_os = "macos")]
+                            window.titlebar_double_click();
+                            #[cfg(not(target_os = "macos"))]
+                            window.zoom_window();
+                        })
+                        .child(self.render_window_controls(window, cx))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w(px(0.))
+                                .h_full()
+                                .window_control_area(WindowControlArea::Drag)
+                                .child(self.render_tab_bar(cx)),
+                        ),
+                )
+            })
             .child(
                 div().flex_1().min_h_0().child(workspace),
             )
